@@ -95,7 +95,7 @@ def cmd_print(args: argparse.Namespace) -> int:
         return 1
 
     info = find_printer(printer)
-    if info is not None and info.interactive and not args.yes:
+    if info is not None and info.interactive and not args.yes and not args.dry_run:
         print(f"警告：「{printer}」是交互式虚拟打印机（端口 {info.port}）。")
         if len(files) > 1:
             print(f"批量打印 {len(files)} 个文件时，它会为每个文件弹一次保存对话框并逐个等待，很容易卡死。")

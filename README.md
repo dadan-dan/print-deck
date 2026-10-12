@@ -45,19 +45,24 @@ DEVMODE（双面/彩色/纸张/方向）通过 `win32print` 直接改写，份�
 
 ### 命令行
 
+打包产物里有两个 exe：`PrintDeck.exe`（图形界面，双击打开）和
+`PrintDeckCLI.exe`（命令行，保留控制台输出）。命令行一律用后者：
+
 ```bat
 :: 列出打印机及能力
-printdeck printers
+PrintDeckCLI.exe printers
 
 :: 批量打印整个文件夹
-printdeck print D:\合同 --printer "HP LaserJet" --copies 2 --duplex
+PrintDeckCLI.exe print D:\合同 --printer "HP LaserJet" --copies 2 --duplex
 
 :: 先看看会打哪些文件，不真打
-printdeck print D:\合同 --dry-run
+PrintDeckCLI.exe print D:\合同 --dry-run
 
 :: 指定页码、黑白、A4
-printdeck print a.pdf b.docx --pages 1-3,5 --color mono --paper A4
+PrintDeckCLI.exe print a.pdf b.docx --pages 1-3,5 --color mono --paper A4
 ```
+
+把文件或文件夹**拖到 `PrintDeck.exe` 图标上**，会直接打开界面并载入这些文件。
 
 ---
 
