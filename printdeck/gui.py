@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor, QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -37,8 +37,10 @@ from PySide6.QtWidgets import (
 )
 
 from .channels.registry import SUPPORTED, collect
+from .config import clear_history, data_dir_text, load_history, load_settings, save_settings
 from .queue import CANCELLED, DONE, FAILED, PENDING, PrintQueue
 from .settings import COLOR_MODES, DUPLEX_MODES, PAPER_SIZES, PrintSettings
+from .util.icon import icon_path
 from .util.printers import default_printer, get_printers
 
 APP_NAME = "PrintDeck 批量打印"
@@ -134,16 +136,24 @@ class MainWindow(QMainWindow):
     def __init__(self, initial_paths=None):
         super().__init__()
         self.setWindowTitle(APP_NAME)
+        icon = icon_path()
+        if icon is not None:
+            self.setWindowIcon(QIcon(str(icon)))
         self.resize(1180, 720)
         self.setAcceptDrops(True)
 
-        self.queue = PrintQueue(PrintSettings(printer=default_printer()))
+        # 恢复上次设置；没有时用系统默认打印机
+        saved = load_settings()
+        if not saved.printer:
+            saved.printer = default_printer()
+        self.queue = PrintQueue(saved)
         self.bridge = _Bridge()
         self.queue.on_change = self.bridge.changed.emit
         self.bridge.changed.connect(self._refresh)
 
         self._row_by_id: dict[int, int] = {}
         self._build_ui()
+        self._apply_settings_to_widgets()
         self._reload_printers()
 
         if initial_paths:
@@ -237,6 +247,7 @@ class MainWindow(QMainWindow):
             ("添加文件夹", self._pick_dir),
             ("移除选中", self._remove_selected),
             ("清空已完成", self._clear_finished),
+            ("历史记录", self._show_history),
         ):
             b = QPushButton(text)
             b.clicked.connect(slot)
@@ -422,6 +433,85 @@ class MainWindow(QMainWindow):
             self, "已请求停止", "已停止后续任务；已经送进打印机后台的页面无法撤回，可在打印机面板里取消。"
         )
         self._refresh()
+
+    # ---------- 设置持久化与历史 ----------
+
+    def _apply_settings_to_widgets(self) -> None:
+        """把已保存的设置回填到界面控件。"""
+        s = self.queue.global_settings
+        self.g_copies.setValue(s.copies)
+        self.g_duplex.setCurrentIndex(DUPLEX_MODES.index(s.duplex) if s.duplex in DUPLEX_MODES else 0)
+        self.g_color.setCurrentIndex(COLOR_MODES.index(s.color) if s.color in COLOR_MODES else 0)
+        self.g_paper.setCurrentIndex(PAPER_SIZES.index(s.paper) if s.paper in PAPER_SIZES else 0)
+        self.g_pages.setText(s.page_range)
+
+    def closeEvent(self, event):  # noqa: N802
+        """关闭时落盘设置，下次启动自动恢复。"""
+        try:
+            self._apply_global()
+            save_settings(self.queue.global_settings)
+        except Exception:
+            pass
+        super().closeEvent(event)
+
+    def _show_history(self) -> None:
+        rows = load_history()
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"打印历史（共 {len(rows)} 条）")
+        dlg.resize(960, 540)
+
+        table = QTableWidget(len(rows), 5)
+        table.setHorizontalHeaderLabels(["时间", "文件名", "打印机", "页数", "结果"])
+        table.verticalHeader().setVisible(False)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        for col in (2, 3, 4):
+            header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+
+        for r, item in enumerate(rows):
+            table.setItem(r, 0, QTableWidgetItem(str(item.get("time", ""))))
+            name = QTableWidgetItem(str(item.get("name", "")))
+            name.setToolTip(str(item.get("path", "")))
+            table.setItem(r, 1, name)
+            table.setItem(r, 2, QTableWidgetItem(str(item.get("printer", ""))))
+            pages = item.get("pages") or 0
+            table.setItem(r, 3, QTableWidgetItem(str(pages) if pages else ""))
+
+            status = str(item.get("status", ""))
+            note = str(item.get("message", "") or "")
+            cell = QTableWidgetItem(f"{status} · {note}" if note else status)
+            if status == FAILED:
+                cell.setForeground(QColor("#dc2626"))
+            elif status == DONE:
+                cell.setForeground(QColor("#059669"))
+            table.setItem(r, 4, cell)
+
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(table)
+
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(QLabel(f"数据目录：{data_dir_text()}"))
+        btn_row.addStretch(1)
+
+        def do_clear() -> None:
+            if QMessageBox.question(dlg, "清空历史", "确定清空全部打印历史？此操作不可撤销。") != QMessageBox.Yes:
+                return
+            clear_history()
+            table.setRowCount(0)
+            dlg.setWindowTitle("打印历史（共 0 条）")
+
+        clear_btn = QPushButton("清空历史")
+        clear_btn.clicked.connect(do_clear)
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dlg.accept)
+        btn_row.addWidget(clear_btn)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        dlg.exec()
 
     # ---------- 刷新 ----------
 

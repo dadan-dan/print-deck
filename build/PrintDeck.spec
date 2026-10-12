@@ -5,6 +5,7 @@ import os
 
 # SPECPATH 由 PyInstaller 注入，指向 spec 文件所在目录（build/），项目根在其上级
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
+ICON = os.path.join(ROOT, "assets", "printdeck.ico")
 
 # 用不到的 Qt 大模块，排除后可显著缩小体积
 EXCLUDES = [
@@ -67,7 +68,7 @@ a = Analysis(
     [os.path.join(ROOT, "printdeck_launcher.py")],
     pathex=[ROOT],
     binaries=[],
-    datas=[],
+    datas=[(ICON, ".")],  # 图标随包带走，供窗口标题栏与资源管理器显示
     hiddenimports=HIDDEN,
     hookspath=[],
     hooksconfig={},
@@ -78,6 +79,7 @@ a = Analysis(
 pyz = PYZ(a.pure)
 
 common = dict(
+    icon=ICON,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -89,7 +89,10 @@ def cmd_print(args: argparse.Namespace) -> int:
         print(f"没有找到受支持的文件。支持：{', '.join(sorted(SUPPORTED))}")
         return 1
 
-    printer = args.printer or default_printer()
+    from .config import load_settings
+
+    saved = load_settings()
+    printer = args.printer or saved.printer or default_printer()
     if not printer:
         print("未指定打印机，且系统没有默认打印机。")
         return 1

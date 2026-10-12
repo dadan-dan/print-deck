@@ -175,14 +175,14 @@ class PrintQueue:
             self._notify()
 
     def _run_one(self, job: Job) -> None:
+        settings = self.effective_settings(job)
+        printer = settings.printer or ""
+
         job.status = CONVERTING
         job.started_at = time.time()
         job.finished_at = None
         job.message = ""
         self._notify()
-
-        settings = self.effective_settings(job)
-        printer = settings.printer or ""
 
         try:
             with tempfile.TemporaryDirectory(prefix="printdeck_") as workdir:
@@ -222,7 +222,17 @@ class PrintQueue:
             job.message = f"{type(exc).__name__}: {exc}"
         finally:
             job.finished_at = time.time()
+            self._record(job, printer)
             self._notify()
+
+    def _record(self, job: Job, printer: str) -> None:
+        """落一条历史；记录失败绝不能影响打印流程。"""
+        try:
+            from .config import record
+
+            record(job.name, job.path, printer, job.pages, job.status, job.message)
+        except Exception:
+            pass
 
     def _notify(self) -> None:
         cb = self.on_change
