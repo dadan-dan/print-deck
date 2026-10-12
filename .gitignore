@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 构建产物
+dist/
+build/.tmp/
+*.manifest
+
+# 自检生成的样本文件
+samples/
+.probe.txt
