@@ -7,7 +7,7 @@
 
 ## 为什么做成这样
 
-市面上的批量打印工具要么收费，要么把文件传上云端。这个项目的目标是：**本机跑、不联网、单文件 exe、双击即用**。
+市面上的批量打印工具要么收费，要么把文件传上云端。这个项目的目标是：**本机跑、不联网、文件夹版分发、双击即用**。
 
 ### 核心设计：所有格式先归一成 PDF
 
@@ -37,7 +37,7 @@ DEVMODE（双面/彩色/纸张/方向）通过 `win32print` 直接改写，份�
 
 ### 图形界面
 
-双击 `PrintDeck.exe`，拖入文件或文件夹 → 选打印机 → 设参数 → 开始打印。
+进入 `dist\PrintDeck` 文件夹，双击里面的 `PrintDeck.exe`，拖入文件或文件夹 → 选打印机 → 设参数 → 开始打印。
 
 - 双击列表里某一行，可以**单独给这个文件**设份数/双面/页码范围
 - 队列实时显示状态、页数、耗时；失败的文件不会中断整批，可一键重试
@@ -45,24 +45,27 @@ DEVMODE（双面/彩色/纸张/方向）通过 `win32print` 直接改写，份�
 
 ### 命令行
 
-打包产物里有两个 exe：`PrintDeck.exe`（图形界面，双击打开）和
-`PrintDeckCLI.exe`（命令行，保留控制台输出）。命令行一律用后者：
+打包产物是两个独立文件夹：`dist\PrintDeck\PrintDeck.exe`（图形界面，双击打开）和
+`dist\PrintDeckCLI\PrintDeckCLI.exe`（命令行，保留控制台输出）。命令行一律用后者：
 
 ```bat
 :: 列出打印机及能力
-PrintDeckCLI.exe printers
+dist\PrintDeckCLI\PrintDeckCLI.exe printers
 
 :: 批量打印整个文件夹
-PrintDeckCLI.exe print D:\合同 --printer "HP LaserJet" --copies 2 --duplex
+dist\PrintDeckCLI\PrintDeckCLI.exe print D:\合同 --printer "HP LaserJet" --copies 2 --duplex
 
 :: 先看看会打哪些文件，不真打
-PrintDeckCLI.exe print D:\合同 --dry-run
+dist\PrintDeckCLI\PrintDeckCLI.exe print D:\合同 --dry-run
 
 :: 指定页码、黑白、A4
-PrintDeckCLI.exe print a.pdf b.docx --pages 1-3,5 --color mono --paper A4
+dist\PrintDeckCLI\PrintDeckCLI.exe print a.pdf b.docx --pages 1-3,5 --color mono --paper A4
 ```
 
-把文件或文件夹**拖到 `PrintDeck.exe` 图标上**，会直接打开界面并载入这些文件。
+把文件或文件夹**拖到 `dist\PrintDeck\PrintDeck.exe` 图标上**，会直接打开界面并载入这些文件。
+
+> **分发时注意**：发给别人时务必**整文件夹**复制（`PrintDeck` 或 `PrintDeckCLI` 整个目录），
+> 不能只单独拷走 `PrintDeck.exe` —— 它依赖同目录下的 `PySide6`、`pymupdf` 等一堆 `.dll/.pyd` 才能运行。
 
 ---
 
@@ -75,13 +78,17 @@ python -m printdeck printers   :: 列出打印机
 python tests\selftest.py       :: 三通道自检
 ```
 
-打包成单文件 exe：
+打包成文件夹版（one-dir）：
 
 ```bat
 python -m PyInstaller build\PrintDeck.spec --distpath dist --workpath build\.tmp --noconfirm
 ```
 
-产物在 `dist\PrintDeck.exe`，**目标机器不需要装 Python 或 Office 之外的任何东西**。
+产物是两个文件夹：
+- `dist\PrintDeck\PrintDeck.exe` —— 图形界面（双击即用）
+- `dist\PrintDeckCLI\PrintDeckCLI.exe` —— 命令行版
+
+**目标机器不需要装 Python 或 Office 之外的任何东西**。把对应整个文件夹发给对方即可。
 
 Office 文档需要目标机器装有 **Microsoft Office / WPS / LibreOffice 之一**；
 三者都没有时，PDF 和图片仍可正常打印。
@@ -109,10 +116,11 @@ Office 文档需要目标机器装有 **Microsoft Office / WPS / LibreOffice 之
 
 ## 已知限制
 
-- 单文件 exe 约 80–120 MB、启动 2–3 秒（PyInstaller 每次运行需解压临时目录）
+- 文件夹版每个目录约 200–260 MB（含 PySide6 / pymupdf 等运行时），启动快、无需解压临时目录
 - Office 转 PDF 依赖本机 Office/WPS/LibreOffice，首次调用会慢（COM 初始化）
 - 已经送进打印机后台（spooler）的页面无法从程序里撤回，只能去打印机面板取消
 - 图片按 A4 纵向排版，多帧 TIFF/动态 GIF 会拆成多页
+- 未做代码签名，部分 Windows 仍可能弹 SmartScreen 警告，点「仍要运行」即可（或自行签名）
 
 ## 许可
 

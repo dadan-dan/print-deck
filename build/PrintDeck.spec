@@ -1,5 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller 打包配置：单文件 Windows 可执行程序。"""
+"""PyInstaller 打包配置：文件夹版（one-dir）Windows 可执行程序。
+
+产出 dist/PrintDeck/（GUI 双击版）与 dist/PrintDeckCLI/（命令行版）两个目录，
+对方整目录复制即可使用，不依赖 Python 环境。
+"""
 
 import os
 
@@ -91,28 +95,43 @@ common = dict(
     entitlements_file=None,
 )
 
-# 图形界面版：双击打开，无控制台窗口
+# 图形界面版：双击打开，无控制台窗口（文件夹版）
+# exclude_binaries=True 让二进制留在目录里，EXE 只做启动器
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
-    [],
+    exclude_binaries=True,
     name="PrintDeck",
     console=False,
     disable_windowed_traceback=False,
     **common,
 )
 
-# 命令行版：保留控制台，供脚本/批处理调用
+coll_gui = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    name="PrintDeck",
+    strip=False,
+    upx=False,
+)
+
+# 命令行版：保留控制台，供脚本/批处理调用（文件夹版）
 cli = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
-    [],
+    exclude_binaries=True,
     name="PrintDeckCLI",
     console=True,
     disable_windowed_traceback=False,
     **common,
+)
+
+coll_cli = COLLECT(
+    cli,
+    a.binaries,
+    a.datas,
+    name="PrintDeckCLI",
+    strip=False,
+    upx=False,
 )
